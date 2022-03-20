@@ -12,7 +12,7 @@
 #include <float.h>
 #include <signal.h>
 
-// Here is structure for every time a user enters an input. It will fill out the struct based on the input:
+// terminal input is used to create a struct using these attributes:
 struct cmdLine_Struct
 {
     char *inFile;
@@ -24,18 +24,15 @@ struct cmdLine_Struct
     int badFile;
 };
 
-// We need to call the same variable inside our handle SIGTSTP function and our main smallsh function. We can
-// accomplish doing both by making a global variable. We will then toggle it: 1 means foreground mode is off,
-// O means foreground mode is on:
-int fg_toggle = 1;
+// Variable toggles foreground inside two different functions:
+int fg_toggle = 1;	// default 1 means foreground is on, 0 means off
 
-// We call our method at the start to avoid error of calling a function before it is intialized:
 void handle_SIGTSTP(int signo);
 
-// Our user input will go into this struct function and we create our main struct:
+// used to create a struct using terminal input:
 struct cmdLine_Struct *new_struct(char *user_input)
 {
-    // We search for the symbols below so we can determine what item to store for our input and output file in our struct:
+    // search for symbols to help with redirection code:
     char input_symbol[] = "<";
     char output_symbol[] = ">";
     
@@ -43,18 +40,17 @@ struct cmdLine_Struct *new_struct(char *user_input)
     char *saveptr;
     int i;
 
-    // We use malloc to create some dynamic memory & intialize current argument amount to 0:
+    // Create dynamic memory for struct:
     struct cmdLine_Struct *current_cmdline = malloc(sizeof(struct cmdLine_Struct));
     current_cmdline->argsAmount = 0;
 
-    // Now we use strtok_r and our pointer to retrieve first token with our space delimiter:
+    // strtok_r gets token using the space delimiter 
     i = 0;
     char *token = strtok_r(user_input, " ", &saveptr);
     char *backup = token;
+    size_t token_length = strlen(token);
 
-    // First check if the token is a file or dir, if not, we make a note of that in our struct.
-    // This way, we can later create a proper error message if the user input is not a file, dir 
-    // or exec command:
+    // Note down if first token is a directory or file name in badFile attribute:
     DIR *pDir;
     int sourceFD = open(token, O_RDONLY);
     if (sourceFD == -1) current_cmdline->badFile = 1;
@@ -63,13 +59,11 @@ struct cmdLine_Struct *new_struct(char *user_input)
     if (pDir == NULL) current_cmdline->badFile = 1;
     closedir (pDir);
 
-    // A variable used to ensure we created a program item in our struct and we can allow the 
-    // remaining tokens to be arguments in our struct:
+    // toggle program to indicate if user input has a program command in it:
     int program = 0;
-    size_t token_length = strlen(token);
+    
 
-    // We continue until the token retrieved is a NULL. That would mean we went through the whole
-    // user input and created a struct out of it:
+    // Use strtok_r until token is NULL. 
     while (token != NULL)
     {
         // Input Symbol:
@@ -106,25 +100,23 @@ struct cmdLine_Struct *new_struct(char *user_input)
         }
         else if (program == 0)
         {
-            // To make exec program work in our fork(), we make sure saved token
-            // doesn't have a newline:
+            // remove newline so exec program can work:
             if (token[token_length - 1] == '\n') token[--token_length] = '\0';
 
-            // We create the dynamic memory, strncpy to build our struct, 
-            // then remove the trailing space:
+            // We create the dynamic memory, strncpy & remove the trailing space:
             current_cmdline->exec_program = calloc(256, sizeof(char));
             strncpy(current_cmdline->exec_program, token, strlen(token));
             token = strtok_r(NULL, " ", &saveptr);
 
-            // Increment so that further items in the user input will be sent to else clause(for arguments)
+            // toggle program indicator:
             program += 1;   
 
-            // Make note that there is a program in the user input. Used as a condition to start exec program in fork():
+            // toggle program indicator to enter exec family clause later:
             current_cmdline->startProgram++;    
         }
         else
         {
-            // Here we build our arguments for our struct. We first intialize variables:
+            // prepate with buffers, etc:
             char *checkDollarsSigns;    // Needle in the haystack, strstr function variable
             int j;
             int k;
@@ -138,17 +130,17 @@ struct cmdLine_Struct *new_struct(char *user_input)
             myIndex = 0;
             newArg = 0;
 
-            // Change the PID integer to a string using sprintf:
+            // PID integer --> string:
             sprintf(current_PID, "%d", bufferPID);
 
-            // Search for occurance of $$. The needle in the hay stack
+            // Search for $$-- The needle in the hay stack
             checkDollarsSigns = strstr(token, "$$");
 
-            // Replace newline with null terminator to prevent errors down stream:
+            // Replace newline with null terminator for error prevention:
             token_length = strlen(token);
             if (token[token_length - 1] == '\n') token[--token_length] = '\0';
 
-            // First we check for "$$". If not, we add the argument directly into our struct
+            // Check if we need to do expansion(is $$ there?)
             if (checkDollarsSigns == NULL)
             {
                 current_cmdline->exec_args[current_cmdline->argsAmount] = calloc(256, sizeof(char));
@@ -156,45 +148,28 @@ struct cmdLine_Struct *new_struct(char *user_input)
                 newArg++;       // To keep count of total number of arguments
             }
 
-            // Complicated logic here. 
-            //          1) We iterate through the token to find the "$$" characters
-            //          2) We create new string with the j variable
-            //          3) We iterate j only when we add characters to our new string
-            //              a) When adding PID number, add length of PID numbers to j. 
-            //              If PID is "123456", we need to do j += 6. This way we create
-            //              proper new string which holds the whole PID number in the
-            //              correct place in the substituted string
-            // 
+            // Code block to create expansion: We replace instance of && with PID number:
             else
             {
-                // This is for when we do find a "$$". In that case, we iterate through token
-                // to find that occurance and replace it with the PID number:
                 for (k = 0; k <= strlen(token); k++)
                 {
-                    // myIndex variable is used 
                     if (token[myIndex] == '$')
                     {
                         if (token[myIndex + 1] == '$')
                         {
                             // If we find a complete match, we can use strcat to add PID to new string:
                             strcat(newString, current_PID);
-                            // Increment 1 to move the main loop pointer to the item after the second
-                            // dollar sign:
                             myIndex += 1;
-
-                            // We don't want to overwrite part of the PID number so we move pointer to 
-                            // after the PID number:
                             j += strlen(current_PID);
                         } else {
-                            // edge case: if there is a '$' symbol only, we add it to the new string:
+                            // edge case: if just 1 $ symbol, no expansion:
                             newString[j] = token[myIndex];
                             j += 1;
                         }
                     }
                     else
                     {
-                        // Here we create our new string. The character added will be in the index of
-                        // the token. 
+                        // Create new string with expansion:
                         newString[j] = token[myIndex];
                         j += 1;
                     }
@@ -203,14 +178,14 @@ struct cmdLine_Struct *new_struct(char *user_input)
                 
                 }
 
-                // We add our newly added string with the PID number as a new argument in our struct:
+                // copy our result into our struct attribute:
                 current_cmdline->exec_args[current_cmdline->argsAmount] = calloc(256, sizeof(char));
                 strcpy(current_cmdline->exec_args[current_cmdline->argsAmount], newString);
                 memset(newString,0,strlen(newString));        // clears our newString for next iteration
                 newArg++;                                     // To help keep count of total arguments
              
             }
-            // We increment this for each time we add an argument:
+            // We increment for each argument:
             current_cmdline->argsAmount++;
             memset(token,0,strlen(token));        
             token = strtok_r(NULL, " ", &saveptr);      // Remove space to search the next token:
@@ -222,19 +197,19 @@ struct cmdLine_Struct *new_struct(char *user_input)
 
 void handle_SIGTSTP(int signo)
 {
-    // When we enter catch Z, this function will catch our press down due to our sigaction assignment in our smallsh function:
     // If we press ctrl Z once, we turn on foreground only mode so & is ignore. We press it again, it disables this feature:
+	
     if (fg_toggle == 1)
     {
 
-        char *message = "Entering foreground-only mode (& is now ignored)\n"; // From lecture Exploration: Signal Handling API: write() section
+        char *message = "Entering foreground-only mode (& is now ignored)\n"; 
         write(1, message, 50);        // We use write because it is a reenterant function
         fflush(stdout);                                       
         fg_toggle = 0;
     }
     else
     {
-        char *message = "Exiting foreground-only mode\n"; // From lecture Exploration: Signal Handling API: write() section
+        char *message = "Exiting foreground-only mode\n"; 
         write(1, message, 30);        // We use write because it is a reenterant function
         fflush(stdout);
         fg_toggle = 1; 
@@ -244,21 +219,16 @@ void handle_SIGTSTP(int signo)
 void statusFunction(status)
 {
     
-
-    // To check if the exit was normal:
+    // To check if the exit was normal: If it is, we can extract process's status using WEXITSTATUS:
     if (WIFEXITED(status))
     {
-        // If True, it calls the WEXITSTATUS function which returns the correct response. WEXITSTATUS function only works
-        // correctly if WIFEXITED returns True. Else, it returns a garbage value.
         printf("exit value %d\n", WEXITSTATUS(status));
         fflush(stdout);
     }
 
-    // To check if the exit was abnormal:
+    // To check if the exit was abnormal: If it is, we can extract process's status using WTERMSIG:
     if WIFSIGNALED (status)
     {
-        // If True, it calls the WTERMSIG function which returns the correct response. WTERMSIG function only works
-        // correctly if WIFSIGNALED returns True. Else, it returns a garbage value.
         printf("terminated by signal %d\n", WTERMSIG(status));
         fflush(stdout);
     }
