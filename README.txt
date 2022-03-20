@@ -1,6 +1,6 @@
 About Project:
 
-This program is creating a simple simple which implements a subset of features of well-known shells, such as bash. It has the following capabilities:
+This program is creating a simple shell which implements a subset of features of well-known shells, such as bash. It has the following capabilities:
 1. Provide prompt for running commands
 2. Handle blank lines and comments(start with #)
 3. Provides expansion for a variable(&&)
