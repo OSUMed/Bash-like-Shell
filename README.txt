@@ -10,7 +10,7 @@ This program is creating a simple simple which implements a subset of features o
 7. Supports commands running in foreground and background processes
 8. Implements custom signal handlers for SIGINT and SIGTSTP
 
-**Instructions on how to run code**:
+Instructions on how to run code:
 
 gcc -std=gnu99 -pthread -o smallsh smallsh.c
 ./smallsh
