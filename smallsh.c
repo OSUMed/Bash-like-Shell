@@ -195,22 +195,21 @@ struct cmdLine_Struct *new_struct(char *user_input)
     return current_cmdline;
 }
 
+// Toggle foreground mode with catching ctrl Z. If foreground mode is toggled on, & in user input is ignored:
 void handle_SIGTSTP(int signo)
-{
-    // If we press ctrl Z once, we turn on foreground only mode so & is ignore. We press it again, it disables this feature:
-	
+{	
     if (fg_toggle == 1)
     {
 
         char *message = "Entering foreground-only mode (& is now ignored)\n"; 
-        write(1, message, 50);        // We use write because it is a reenterant function
+        write(1, message, 50);        // Use write because it is a reenterant function
         fflush(stdout);                                       
         fg_toggle = 0;
     }
     else
     {
         char *message = "Exiting foreground-only mode\n"; 
-        write(1, message, 30);        // We use write because it is a reenterant function
+        write(1, message, 30);        // Use write because it is a reenterant function
         fflush(stdout);
         fg_toggle = 1; 
     }
