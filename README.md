@@ -1,6 +1,6 @@
 ## Project Overview
 
-A shell is a user interface for accessing an operating system's services. In the realm of Unix-like operating systems, the shell provides a command-line interface for users, allowing them to run commands, navigate directories, manage processes, and more. For this project, I've developed a simple shell, mimicking some core functionalities found in established shells such as bash.
+For this project, I've developed a minimalistic shell that mirrors core functionalities of renowned shells like bash. While most on this platform are likely familiar with the concept, for context, a shell serves as a command-line interface in Unix-like operating systems, enabling users to run commands, traverse directories, oversee processes, and more.
 
 ## Capabilities
 
